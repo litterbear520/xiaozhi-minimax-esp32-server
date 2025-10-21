@@ -58,7 +58,7 @@ public class ModelController {
 
     @GetMapping("/{modelType}/provideTypes")
     @Operation(summary = "获取模型供应器列表")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")  // 改为normal权限，所有用户都需要查看提供商列表
     public Result<List<ModelProviderDTO>> getModelProviderList(@PathVariable String modelType) {
         List<ModelProviderDTO> modelProviderDTOS = modelProviderService.getListByModelType(modelType);
         return new Result<List<ModelProviderDTO>>().ok(modelProviderDTOS);
@@ -66,22 +66,24 @@ public class ModelController {
 
     @GetMapping("/list")
     @Operation(summary = "获取模型配置列表")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")  // 改为normal权限，所有用户可访问
     public Result<PageData<ModelConfigDTO>> getModelConfigList(
             @RequestParam(required = true) String modelType,
             @RequestParam(required = false) String modelName,
             @RequestParam(required = true, defaultValue = "0") String page,
             @RequestParam(required = true, defaultValue = "10") String limit) {
+        // Service层会根据用户身份自动过滤数据
         PageData<ModelConfigDTO> pageList = modelConfigService.getPageList(modelType, modelName, page, limit);
         return new Result<PageData<ModelConfigDTO>>().ok(pageList);
     }
 
     @PostMapping("/{modelType}/{provideCode}")
     @Operation(summary = "新增模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")  // 改为normal权限，所有用户可创建自己的配置
     public Result<ModelConfigDTO> addModelConfig(@PathVariable String modelType,
             @PathVariable String provideCode,
             @RequestBody ModelConfigBodyDTO modelConfigBodyDTO) {
+        // Service层会自动设置creator为当前用户
         ModelConfigDTO modelConfigDTO = modelConfigService.add(modelType, provideCode, modelConfigBodyDTO);
         configService.getConfig(false);
         return new Result<ModelConfigDTO>().ok(modelConfigDTO);
@@ -89,11 +91,12 @@ public class ModelController {
 
     @PutMapping("/{modelType}/{provideCode}/{id}")
     @Operation(summary = "编辑模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")  // 改为normal权限，用户可编辑自己的配置
     public Result<ModelConfigDTO> editModelConfig(@PathVariable String modelType,
             @PathVariable String provideCode,
             @PathVariable String id,
             @RequestBody ModelConfigBodyDTO modelConfigBodyDTO) {
+        // Service层会校验权限：只能编辑自己的配置
         ModelConfigDTO modelConfigDTO = modelConfigService.edit(modelType, provideCode, id, modelConfigBodyDTO);
         configService.getConfig(false);
         return new Result<ModelConfigDTO>().ok(modelConfigDTO);
@@ -101,15 +104,16 @@ public class ModelController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "删除模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")  // 改为normal权限，用户可删除自己的配置
     public Result<Void> deleteModelConfig(@PathVariable String id) {
+        // Service层会校验权限：只能删除自己的配置
         modelConfigService.delete(id);
         return new Result<>();
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "获取模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")  // 改为normal权限
     public Result<ModelConfigDTO> getModelConfig(@PathVariable String id) {
         ModelConfigEntity item = modelConfigService.selectById(id);
         ModelConfigDTO modelConfigDTO = ConvertUtils.sourceToTarget(item, ModelConfigDTO.class);
@@ -118,7 +122,7 @@ public class ModelController {
 
     @PutMapping("/enable/{id}/{status}")
     @Operation(summary = "启用/关闭模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")  // 改为normal权限
     public Result<Void> enableModelConfig(@PathVariable String id, @PathVariable Integer status) {
         ModelConfigEntity entity = modelConfigService.selectById(id);
         if (entity == null) {
@@ -131,7 +135,7 @@ public class ModelController {
 
     @PutMapping("/default/{id}")
     @Operation(summary = "设置默认模型")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")  // 改为normal权限，所有用户都可以设置默认模型
     public Result<Void> setDefaultModel(@PathVariable String id) {
         ModelConfigEntity entity = modelConfigService.selectById(id);
         if (entity == null) {

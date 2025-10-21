@@ -1,0 +1,18 @@
+# 基于已有的web镜像作为基础
+FROM ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:web_latest
+
+# 清理旧的前端文件（先删除再复制，确保完全覆盖）
+RUN rm -rf /usr/share/nginx/html/*
+
+# 复制编译好的后端jar包到正确位置（覆盖基础镜像的旧jar包）
+COPY manager-api/target/xiaozhi-esp32-api.jar /app/xiaozhi-esp32-api.jar
+
+# 复制编译好的前端静态文件到Nginx正确的位置
+COPY manager-web/dist/ /usr/share/nginx/html/
+
+# 暴露端口
+EXPOSE 8002
+
+# 启动命令
+CMD ["/start.sh"]
+

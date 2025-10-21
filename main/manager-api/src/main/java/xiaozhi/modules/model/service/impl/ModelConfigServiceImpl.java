@@ -38,6 +38,7 @@ import xiaozhi.modules.model.dto.ModelProviderDTO;
 import xiaozhi.modules.model.entity.ModelConfigEntity;
 import xiaozhi.modules.model.service.ModelConfigService;
 import xiaozhi.modules.model.service.ModelProviderService;
+import xiaozhi.modules.security.user.SecurityUser;
 
 @Service
 @AllArgsConstructor
@@ -51,23 +52,43 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
 
     @Override
     public List<ModelBasicInfoDTO> getModelCodeList(String modelType, String modelName) {
-        List<ModelConfigEntity> entities = modelConfigDao.selectList(
-                new QueryWrapper<ModelConfigEntity>()
-                        .eq("model_type", modelType)
-                        .eq("is_enabled", 1)
-                        .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%")
-                        .select("id", "model_name"));
+        // 获取当前用户ID用于数据过滤
+        Long currentUserId = SecurityUser.getUserId();
+        
+        QueryWrapper<ModelConfigEntity> wrapper = new QueryWrapper<ModelConfigEntity>()
+                .eq("model_type", modelType)
+                .eq("is_enabled", 1)
+                .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%");
+        
+        // 数据权限过滤：只返回系统配置（creator为NULL）或用户自己创建的配置
+        if (currentUserId != null) {
+            wrapper.and(w -> w.isNull("creator").or().eq("creator", currentUserId));
+        }
+        
+        wrapper.select("id", "model_name");
+        
+        List<ModelConfigEntity> entities = modelConfigDao.selectList(wrapper);
         return ConvertUtils.sourceToTarget(entities, ModelBasicInfoDTO.class);
     }
 
     @Override
     public List<LlmModelBasicInfoDTO> getLlmModelCodeList(String modelName) {
-        List<ModelConfigEntity> entities = modelConfigDao.selectList(
-                new QueryWrapper<ModelConfigEntity>()
-                        .eq("model_type", "llm")
-                        .eq("is_enabled", 1)
-                        .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%")
-                        .select("id", "model_name", "config_json"));
+        // 获取当前用户ID用于数据过滤
+        Long currentUserId = SecurityUser.getUserId();
+        
+        QueryWrapper<ModelConfigEntity> wrapper = new QueryWrapper<ModelConfigEntity>()
+                .eq("model_type", "llm")
+                .eq("is_enabled", 1)
+                .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%");
+        
+        // 数据权限过滤：只返回系统配置（creator为NULL）或用户自己创建的配置
+        if (currentUserId != null) {
+            wrapper.and(w -> w.isNull("creator").or().eq("creator", currentUserId));
+        }
+        
+        wrapper.select("id", "model_name", "config_json");
+        
+        List<ModelConfigEntity> entities = modelConfigDao.selectList(wrapper);
 
         return entities.stream().map(item -> {
             LlmModelBasicInfoDTO dto = new LlmModelBasicInfoDTO();
@@ -93,11 +114,20 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         pageInfo.addOrder(OrderItem.desc("is_enabled"));
         pageInfo.addOrder(OrderItem.asc("sort"));
 
-        IPage<ModelConfigEntity> modelConfigEntityIPage = modelConfigDao.selectPage(
-                pageInfo,
-                new QueryWrapper<ModelConfigEntity>()
-                        .eq("model_type", modelType)
-                        .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%"));
+        // 获取当前用户ID和权限
+        Long currentUserId = SecurityUser.getUserId();
+        boolean isSuperAdmin = SecurityUser.getUser().getSuperAdmin() == 1;
+        
+        QueryWrapper<ModelConfigEntity> wrapper = new QueryWrapper<ModelConfigEntity>()
+                .eq("model_type", modelType)
+                .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%");
+        
+        // 数据权限过滤：超级管理员可以看到所有配置，普通用户只能看到系统配置和自己的配置
+        if (!isSuperAdmin && currentUserId != null) {
+            wrapper.and(w -> w.isNull("creator").or().eq("creator", currentUserId));
+        }
+
+        IPage<ModelConfigEntity> modelConfigEntityIPage = modelConfigDao.selectPage(pageInfo, wrapper);
 
         return getPageData(modelConfigEntityIPage, ModelConfigDTO.class);
     }
@@ -112,20 +142,23 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
 
         // 3. 获取原始配置（不经过敏感数据处理）
         ModelConfigEntity originalEntity = getOriginalConfigFromDb(id);
+        
+        // 4. 权限校验：只能编辑自己创建的配置
+        validateEditPermission(originalEntity);
 
-        // 4. 验证LLM配置
+        // 5. 验证LLM配置
         validateLlmConfiguration(modelConfigBodyDTO);
 
-        // 5. 准备更新实体并处理敏感数据
+        // 6. 准备更新实体并处理敏感数据
         ModelConfigEntity modelConfigEntity = prepareUpdateEntity(modelConfigBodyDTO, originalEntity, modelType, id);
 
-        // 6. 执行数据库更新
+        // 7. 执行数据库更新
         modelConfigDao.updateById(modelConfigEntity);
 
-        // 7. 清除缓存
+        // 8. 清除缓存
         clearModelCache(id);
 
-        // 8. 返回处理后的数据（包含敏感数据掩码）
+        // 9. 返回处理后的数据（包含敏感数据掩码）
         return buildResponseDTO(modelConfigEntity);
     }
 
@@ -136,6 +169,12 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         validateModelProvider(modelType, provideCode);
 
         ModelConfigEntity modelConfigEntity = prepareAddEntity(modelConfigBodyDTO, modelType);
+        
+        // 自动设置创建者为当前用户
+        Long currentUserId = SecurityUser.getUserId();
+        if (currentUserId != null) {
+            modelConfigEntity.setCreator(currentUserId);
+        }
 
         modelConfigDao.insert(modelConfigEntity);
 
@@ -149,7 +188,14 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         }
 
         ModelConfigEntity modelConfig = modelConfigDao.selectById(id);
-        if (modelConfig != null && modelConfig.getIsDefault() == 1) {
+        if (modelConfig == null) {
+            throw new RenException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        
+        // 权限校验：不能删除系统配置，只能删除自己创建的配置
+        validateDeletePermission(modelConfig);
+        
+        if (modelConfig.getIsDefault() == 1) {
             throw new RenException(ErrorCode.DEFAULT_MODEL_DELETE_ERROR);
         }
 
@@ -280,6 +326,60 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         List<ModelProviderDTO> providerList = modelProviderService.getList(modelType, provideCode);
         if (CollectionUtil.isEmpty(providerList)) {
             throw new RenException(ErrorCode.MODEL_PROVIDER_NOT_EXIST);
+        }
+    }
+    
+    /**
+     * 验证编辑权限
+     * 规则：
+     * 1. 超级管理员可以编辑所有配置（包括系统配置）
+     * 2. 普通用户只能编辑自己创建的配置（creator = userId）
+     * 3. 普通用户不能编辑系统配置（creator为NULL）
+     */
+    private void validateEditPermission(ModelConfigEntity entity) {
+        Long currentUserId = SecurityUser.getUserId();
+        boolean isSuperAdmin = SecurityUser.getUser().getSuperAdmin() == 1;
+        
+        // 超级管理员拥有所有权限
+        if (isSuperAdmin) {
+            return;
+        }
+        
+        // 系统配置（creator为NULL）只有管理员可以编辑
+        if (entity.getCreator() == null) {
+            throw new RenException("无权编辑系统默认配置，您可以复制该配置并修改");
+        }
+        
+        // 普通用户只能编辑自己创建的配置
+        if (currentUserId == null || !currentUserId.equals(entity.getCreator())) {
+            throw new RenException("无权编辑此模型配置");
+        }
+    }
+    
+    /**
+     * 验证删除权限
+     * 规则：
+     * 1. 任何人都不能删除系统配置（creator为NULL）
+     * 2. 超级管理员可以删除所有用户创建的配置
+     * 3. 普通用户只能删除自己创建的配置
+     */
+    private void validateDeletePermission(ModelConfigEntity entity) {
+        Long currentUserId = SecurityUser.getUserId();
+        boolean isSuperAdmin = SecurityUser.getUser().getSuperAdmin() == 1;
+        
+        // 系统配置（creator为NULL）不能删除
+        if (entity.getCreator() == null) {
+            throw new RenException("不能删除系统默认配置");
+        }
+        
+        // 超级管理员可以删除所有用户创建的配置
+        if (isSuperAdmin) {
+            return;
+        }
+        
+        // 普通用户只能删除自己创建的配置
+        if (currentUserId == null || !currentUserId.equals(entity.getCreator())) {
+            throw new RenException("无权删除此模型配置");
         }
     }
 

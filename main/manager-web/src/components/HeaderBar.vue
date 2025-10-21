@@ -96,8 +96,8 @@
           </el-dropdown-menu>
         </el-dropdown>
 
+        <!-- 模型配置菜单 - 开放给所有用户 -->
         <div
-          v-if="isSuperAdmin"
           class="equipment-management"
           :class="{ 'active-tab': $route.path === '/model-config' }"
           @click="goModelConfig"

@@ -43,4 +43,7 @@ public class ModelConfigDTO implements Serializable {
 
     @Schema(description = "排序")
     private Integer sort;
+
+    @Schema(description = "创建者ID")
+    private Long creator;
 }
