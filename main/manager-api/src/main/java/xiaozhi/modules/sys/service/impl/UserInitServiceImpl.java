@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import xiaozhi.modules.model.dao.ModelConfigDao;
 import xiaozhi.modules.model.entity.ModelConfigEntity;
+import xiaozhi.modules.sys.dao.SysUserDao;
+import xiaozhi.modules.sys.entity.SysUserEntity;
 import xiaozhi.modules.sys.service.UserInitService;
 
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import java.util.List;
 public class UserInitServiceImpl implements UserInitService {
 
     private final ModelConfigDao modelConfigDao;
+    private final SysUserDao sysUserDao;
     
     // 需要清空的敏感字段列表
     private static final List<String> SENSITIVE_FIELDS = Arrays.asList(
@@ -40,15 +43,29 @@ public class UserInitServiceImpl implements UserInitService {
     public void initUserModelConfigs(Long userId) {
         log.info("开始为用户 {} 初始化默认模型配置", userId);
         
-        // 查找admin用户（userId=1）的所有配置作为模板
+        // 查找第一个超级管理员用户作为模板来源
+        QueryWrapper<SysUserEntity> userWrapper = new QueryWrapper<>();
+        userWrapper.eq("super_admin", 1);
+        userWrapper.orderByAsc("id");
+        userWrapper.last("LIMIT 1");
+        SysUserEntity adminUser = sysUserDao.selectOne(userWrapper);
+        
+        if (adminUser == null) {
+            log.error("未找到超级管理员用户，无法初始化配置");
+            return;
+        }
+        
+        log.info("从超级管理员 {} (ID:{}) 复制配置", adminUser.getUsername(), adminUser.getId());
+        
+        // 查找超级管理员的所有配置作为模板
         QueryWrapper<ModelConfigEntity> wrapper = new QueryWrapper<>();
-        wrapper.eq("creator", 1L); // admin用户ID为1
+        wrapper.eq("creator", adminUser.getId());
         wrapper.orderByAsc("sort");
         
         List<ModelConfigEntity> templateConfigs = modelConfigDao.selectList(wrapper);
         
         if (templateConfigs == null || templateConfigs.isEmpty()) {
-            log.warn("未找到admin用户的模板配置，跳过用户 {} 的配置初始化", userId);
+            log.warn("超级管理员 {} 没有配置，跳过用户 {} 的配置初始化", adminUser.getUsername(), userId);
             return;
         }
         
