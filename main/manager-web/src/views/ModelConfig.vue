@@ -89,9 +89,6 @@
               >
                 <template slot-scope="scope">
                   {{ scope.row.modelName }}
-                  <!-- 配置所有权标识 -->
-                  <el-tag v-if="!scope.row.creator" size="mini" type="info" style="margin-left: 8px">系统</el-tag>
-                  <el-tag v-else-if="scope.row.creator === currentUserId" size="mini" type="success" style="margin-left: 8px">我的</el-tag>
                 </template>
               </el-table-column>
               <el-table-column :label="$t('modelConfig.provider')" align="center">
@@ -140,12 +137,11 @@
               <el-table-column
                 :label="$t('modelConfig.action')"
                 align="center"
-                width="240px"
+                width="180px"
               >
                 <template slot-scope="scope">
-                  <!-- 编辑按钮：只对自己的配置或超级管理员可见 -->
+                  <!-- 所有配置都可以编辑 -->
                   <el-button
-                    v-if="canEdit(scope.row)"
                     type="text"
                     size="mini"
                     @click="editModel(scope.row)"
@@ -153,28 +149,17 @@
                   >
                     {{ $t("modelConfig.edit") }}
                   </el-button>
-                  <!-- 查看按钮：对不能编辑的配置显示 -->
-                  <el-button
-                    v-else
-                    type="text"
-                    size="mini"
-                    @click="viewModel(scope.row)"
-                    class="edit-btn"
-                  >
-                    查看
-                  </el-button>
-                  <!-- 复制按钮：对所有配置都可以复制 -->
+                  <!-- 所有配置都可以复制 -->
                   <el-button
                     type="text"
                     size="mini"
                     @click="duplicateModel(scope.row)"
                     class="edit-btn"
                   >
-                    {{ !scope.row.creator ? '复制为我的' : $t("modelConfig.duplicate") }}
+                    {{ $t("modelConfig.duplicate") }}
                   </el-button>
-                  <!-- 删除按钮：只对自己的配置或超级管理员可删除 -->
+                  <!-- 所有配置都可以删除 -->
                   <el-button
-                    v-if="canDelete(scope.row)"
                     type="text"
                     size="mini"
                     @click="deleteModel(scope.row)"
@@ -377,38 +362,6 @@ export default {
   },
 
   methods: {
-    // 判断是否可以编辑配置
-    canEdit(row) {
-      // 超级管理员可以编辑所有配置
-      if (this.isSuperAdmin) {
-        return true;
-      }
-      // 系统配置（creator为null）只有管理员可以编辑
-      if (!row.creator) {
-        return false;
-      }
-      // 普通用户只能编辑自己创建的配置
-      return row.creator === this.currentUserId;
-    },
-    // 判断是否可以删除配置
-    canDelete(row) {
-      // 系统配置（creator为null）任何人都不能删除
-      if (!row.creator) {
-        return false;
-      }
-      // 超级管理员可以删除用户创建的配置
-      if (this.isSuperAdmin) {
-        return true;
-      }
-      // 普通用户只能删除自己创建的配置
-      return row.creator === this.currentUserId;
-    },
-    // 查看模型配置（只读模式）
-    viewModel(model) {
-      this.editModelData = JSON.parse(JSON.stringify(model));
-      this.editModelData.viewMode = true; // 设置为查看模式
-      this.editDialogVisible = true;
-    },
     // 更新选择列表头翻译文本
     updateSelectionHeaderText() {
       const thElement = document.querySelector(`.el-table__header th:nth-child(1) .cell`);

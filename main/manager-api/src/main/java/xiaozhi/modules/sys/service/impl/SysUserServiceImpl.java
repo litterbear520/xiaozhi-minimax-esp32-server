@@ -15,6 +15,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import xiaozhi.common.constant.Constant;
 import xiaozhi.common.exception.ErrorCode;
 import xiaozhi.common.exception.RenException;
@@ -32,11 +33,13 @@ import xiaozhi.modules.sys.entity.SysUserEntity;
 import xiaozhi.modules.sys.enums.SuperAdminEnum;
 import xiaozhi.modules.sys.service.SysParamsService;
 import xiaozhi.modules.sys.service.SysUserService;
+import xiaozhi.modules.sys.service.UserInitService;
 import xiaozhi.modules.sys.vo.AdminPageUserVO;
 
 /**
  * 系统用户
  */
+@Slf4j
 @AllArgsConstructor
 @Service
 public class SysUserServiceImpl extends BaseServiceImpl<SysUserDao, SysUserEntity> implements SysUserService {
@@ -47,6 +50,8 @@ public class SysUserServiceImpl extends BaseServiceImpl<SysUserDao, SysUserEntit
     private final AgentService agentService;
 
     private final SysParamsService sysParamsService;
+    
+    private final UserInitService userInitService;
 
     @Override
     public SysUserDTO getByUsername(String username) {
@@ -91,6 +96,16 @@ public class SysUserServiceImpl extends BaseServiceImpl<SysUserDao, SysUserEntit
         entity.setStatus(1);
 
         insert(entity);
+        
+        // 为新用户初始化默认模型配置（从admin复制）
+        if (userCount > 0) { // 如果不是第一个用户（admin）
+            try {
+                userInitService.initUserModelConfigs(entity.getId());
+            } catch (Exception e) {
+                // 记录日志但不影响用户创建
+                log.error("初始化用户配置失败", e);
+            }
+        }
     }
 
     @Override

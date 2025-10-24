@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -38,6 +39,7 @@ import xiaozhi.modules.model.dto.ModelProviderDTO;
 import xiaozhi.modules.model.entity.ModelConfigEntity;
 import xiaozhi.modules.model.service.ModelConfigService;
 import xiaozhi.modules.model.service.ModelProviderService;
+import xiaozhi.modules.model.service.UserModelPreferenceService;
 import xiaozhi.modules.security.user.SecurityUser;
 
 @Service
@@ -49,6 +51,8 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
     private final ModelProviderService modelProviderService;
     private final RedisUtils redisUtils;
     private final AgentDao agentDao;
+    @Lazy
+    private final UserModelPreferenceService userModelPreferenceService;
 
     @Override
     public List<ModelBasicInfoDTO> getModelCodeList(String modelType, String modelName) {
@@ -60,9 +64,9 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
                 .eq("is_enabled", 1)
                 .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%");
         
-        // 数据权限过滤：只返回系统配置（creator为NULL）或用户自己创建的配置
+        // 数据权限过滤：只返回用户自己创建的配置（彻底隔离）
         if (currentUserId != null) {
-            wrapper.and(w -> w.isNull("creator").or().eq("creator", currentUserId));
+            wrapper.eq("creator", currentUserId);
         }
         
         wrapper.select("id", "model_name");
@@ -81,9 +85,9 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
                 .eq("is_enabled", 1)
                 .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%");
         
-        // 数据权限过滤：只返回系统配置（creator为NULL）或用户自己创建的配置
+        // 数据权限过滤：只返回用户自己创建的配置（彻底隔离）
         if (currentUserId != null) {
-            wrapper.and(w -> w.isNull("creator").or().eq("creator", currentUserId));
+            wrapper.eq("creator", currentUserId);
         }
         
         wrapper.select("id", "model_name", "config_json");
@@ -114,22 +118,36 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         pageInfo.addOrder(OrderItem.desc("is_enabled"));
         pageInfo.addOrder(OrderItem.asc("sort"));
 
-        // 获取当前用户ID和权限
+        // 获取当前用户ID
         Long currentUserId = SecurityUser.getUserId();
-        boolean isSuperAdmin = SecurityUser.getUser().getSuperAdmin() == 1;
         
         QueryWrapper<ModelConfigEntity> wrapper = new QueryWrapper<ModelConfigEntity>()
                 .eq("model_type", modelType)
                 .like(StringUtils.isNotBlank(modelName), "model_name", "%" + modelName + "%");
         
-        // 数据权限过滤：超级管理员可以看到所有配置，普通用户只能看到系统配置和自己的配置
-        if (!isSuperAdmin && currentUserId != null) {
-            wrapper.and(w -> w.isNull("creator").or().eq("creator", currentUserId));
+        // 数据权限过滤：所有用户（包括admin）只能看到自己的配置（彻底隔离）
+        if (currentUserId != null) {
+            wrapper.eq("creator", currentUserId);
         }
 
         IPage<ModelConfigEntity> modelConfigEntityIPage = modelConfigDao.selectPage(pageInfo, wrapper);
 
-        return getPageData(modelConfigEntityIPage, ModelConfigDTO.class);
+        PageData<ModelConfigDTO> pageData = getPageData(modelConfigEntityIPage, ModelConfigDTO.class);
+        
+        // 根据用户偏好设置每个配置的is_default状态
+        String userDefaultModelId = userModelPreferenceService.getUserDefaultModelId(currentUserId, modelType);
+        if (pageData != null && pageData.getList() != null) {
+            for (ModelConfigDTO dto : pageData.getList()) {
+                // 如果当前配置是用户的默认配置，则设置is_default为1，否则为0
+                if (userDefaultModelId != null && userDefaultModelId.equals(dto.getId())) {
+                    dto.setIsDefault(1);
+                } else {
+                    dto.setIsDefault(0);
+                }
+            }
+        }
+        
+        return pageData;
     }
 
     @Override
@@ -338,20 +356,9 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
      */
     private void validateEditPermission(ModelConfigEntity entity) {
         Long currentUserId = SecurityUser.getUserId();
-        boolean isSuperAdmin = SecurityUser.getUser().getSuperAdmin() == 1;
         
-        // 超级管理员拥有所有权限
-        if (isSuperAdmin) {
-            return;
-        }
-        
-        // 系统配置（creator为NULL）只有管理员可以编辑
-        if (entity.getCreator() == null) {
-            throw new RenException("无权编辑系统默认配置，您可以复制该配置并修改");
-        }
-        
-        // 普通用户只能编辑自己创建的配置
-        if (currentUserId == null || !currentUserId.equals(entity.getCreator())) {
+        // 所有用户只能编辑自己创建的配置（彻底隔离）
+        if (entity.getCreator() == null || !currentUserId.equals(entity.getCreator())) {
             throw new RenException("无权编辑此模型配置");
         }
     }
@@ -365,20 +372,9 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
      */
     private void validateDeletePermission(ModelConfigEntity entity) {
         Long currentUserId = SecurityUser.getUserId();
-        boolean isSuperAdmin = SecurityUser.getUser().getSuperAdmin() == 1;
         
-        // 系统配置（creator为NULL）不能删除
-        if (entity.getCreator() == null) {
-            throw new RenException("不能删除系统默认配置");
-        }
-        
-        // 超级管理员可以删除所有用户创建的配置
-        if (isSuperAdmin) {
-            return;
-        }
-        
-        // 普通用户只能删除自己创建的配置
-        if (currentUserId == null || !currentUserId.equals(entity.getCreator())) {
+        // 所有用户只能删除自己创建的配置（彻底隔离）
+        if (entity.getCreator() == null || !currentUserId.equals(entity.getCreator())) {
             throw new RenException("无权删除此模型配置");
         }
     }

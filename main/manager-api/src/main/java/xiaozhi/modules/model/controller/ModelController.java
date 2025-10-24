@@ -25,6 +25,8 @@ import xiaozhi.modules.model.dto.*;
 import xiaozhi.modules.model.entity.ModelConfigEntity;
 import xiaozhi.modules.model.service.ModelConfigService;
 import xiaozhi.modules.model.service.ModelProviderService;
+import xiaozhi.modules.model.service.UserModelPreferenceService;
+import xiaozhi.modules.security.user.SecurityUser;
 import xiaozhi.modules.timbre.service.TimbreService;
 
 @AllArgsConstructor
@@ -38,6 +40,7 @@ public class ModelController {
     private final ModelConfigService modelConfigService;
     private final ConfigService configService;
     private final AgentTemplateService agentTemplateService;
+    private final UserModelPreferenceService userModelPreferenceService;
 
     @GetMapping("/names")
     @Operation(summary = "获取所有模型名称")
@@ -141,15 +144,15 @@ public class ModelController {
         if (entity == null) {
             return new Result<Void>().error("模型配置不存在");
         }
-        // 将其他模型设置为非默认
-        modelConfigService.setDefaultModel(entity.getModelType(), 0);
-        entity.setIsEnabled(1);
-        entity.setIsDefault(1);
-        modelConfigService.updateById(entity);
+        
+        // 使用用户级别的偏好设置，而不是全局设置
+        Long currentUserId = SecurityUser.getUserId();
+        userModelPreferenceService.setUserDefaultModel(currentUserId, entity.getModelType(), id);
 
-        // 更新模板表中对应的模型ID
+        // 更新模板表中对应的模型ID（仅对当前用户生效）
         agentTemplateService.updateDefaultTemplateModelId(entity.getModelType(), entity.getId());
 
+        // 刷新配置
         configService.getConfig(false);
         return new Result<Void>();
     }
