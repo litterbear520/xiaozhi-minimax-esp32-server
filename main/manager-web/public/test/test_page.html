@@ -945,6 +945,10 @@
                                 log(`服务器握手成功，会话ID: ${response.session_id}`, 'success');
                                 clearTimeout(timeout);
                                 websocket.removeEventListener('message', onMessageHandler);
+                                
+                                // 连接成功后，自动绑定设备到智能体
+                                autoBindDeviceToAgent(config.deviceMac);
+                                
                                 resolve(true);
                             }
                         } catch (e) {
@@ -1004,6 +1008,100 @@
                 }
             }
             return mac;
+        }
+
+        // 自动绑定设备到智能体
+        async function autoBindDeviceToAgent(deviceMac) {
+            try {
+                // 从URL参数获取agentId
+                const urlParams = new URLSearchParams(window.location.search);
+                const agentId = urlParams.get('agentId');
+                
+                log(`=== 开始自动绑定设备 ===`, 'info');
+                log(`agentId: ${agentId}`, 'info');
+                log(`deviceMac: ${deviceMac}`, 'info');
+                
+                if (!agentId) {
+                    log('未检测到智能体ID，跳过自动绑定', 'info');
+                    return;
+                }
+
+                // 获取token
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    log('未找到登录token，无法自动绑定设备', 'warning');
+                    return;
+                }
+
+                log(`token原始值: ${token.substring(0, 50)}...`, 'info');
+                const tokenObj = JSON.parse(token);
+                log(`解析后的token对象keys: ${Object.keys(tokenObj).join(', ')}`, 'info');
+                const baseUrl = 'http://47.103.24.213:8002';
+
+                // 1. 先检查设备是否已经绑定到该智能体
+                log('检查设备是否已绑定...', 'info');
+                log(`请求URL: ${baseUrl}/xiaozhi/device/bind/${agentId}`, 'info');
+                log(`Authorization: ${tokenObj.token ? tokenObj.token.substring(0, 20) + '...' : '未找到token字段'}`, 'info');
+                
+                const checkResponse = await fetch(`${baseUrl}/xiaozhi/device/bind/${agentId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + tokenObj.token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                log(`检查设备响应状态: ${checkResponse.status}`, 'info');
+                if (!checkResponse.ok) {
+                    const errorText = await checkResponse.text();
+                    log(`检查设备绑定状态失败: ${checkResponse.status} - ${errorText}`, 'error');
+                    return;
+                }
+
+                const checkData = await checkResponse.json();
+                log(`检查设备响应: ${JSON.stringify(checkData).substring(0, 100)}`, 'info');
+                if (checkData.code === 0) {
+                    // 检查是否已经绑定
+                    const devices = checkData.data || [];
+                    const isAlreadyBound = devices.some(device => device.deviceCode === deviceMac);
+                    
+                    if (isAlreadyBound) {
+                        log('设备已绑定到当前智能体，无需重复绑定', 'success');
+                        return;
+                    }
+
+                    // 2. 如果设备未绑定，则进行绑定
+                    log(`自动绑定设备 ${deviceMac} 到智能体...`, 'info');
+                    log(`绑定请求URL: ${baseUrl}/xiaozhi/device/bind/${agentId}/${deviceMac}`, 'info');
+                    
+                    const bindResponse = await fetch(`${baseUrl}/xiaozhi/device/bind/${agentId}/${deviceMac}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + tokenObj.token,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    log(`绑定响应状态: ${bindResponse.status}`, 'info');
+                    if (!bindResponse.ok) {
+                        const errorText = await bindResponse.text();
+                        log(`设备绑定请求失败: ${bindResponse.status} - ${errorText}`, 'error');
+                        return;
+                    }
+
+                    const bindData = await bindResponse.json();
+                    log(`绑定响应数据: ${JSON.stringify(bindData)}`, 'info');
+                    if (bindData.code === 0) {
+                        log('✓ 设备已自动绑定到智能体', 'success');
+                    } else {
+                        log(`设备绑定失败: ${bindData.msg || '未知错误'}`, 'error');
+                    }
+                } else {
+                    log(`获取设备列表失败: ${checkData.msg || '未知错误'}`, 'error');
+                }
+            } catch (error) {
+                log(`自动绑定设备异常: ${error.message}`, 'error');
+            }
         }
 
         // 初始化事件监听器
@@ -1208,6 +1306,26 @@
 
         // 初始化应用
         function initApp() {
+            // 立即显示诊断信息
+            const urlParams = new URLSearchParams(window.location.search);
+            const agentId = urlParams.get('agentId');
+            const token = localStorage.getItem('token');
+            
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            log('🔍 页面加载诊断信息', 'info');
+            log(`   URL中的agentId: ${agentId || '❌ 未找到'}`, agentId ? 'success' : 'error');
+            log(`   localStorage中的token: ${token ? '✅ 已找到' : '❌ 未找到'}`, token ? 'success' : 'error');
+            if (token) {
+                try {
+                    const tokenObj = JSON.parse(token);
+                    log(`   token对象keys: ${Object.keys(tokenObj).join(', ')}`, 'info');
+                } catch (e) {
+                    log(`   token解析失败: ${e.message}`, 'error');
+                }
+            }
+            log(`   完整URL: ${window.location.href}`, 'info');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+            
             initVisualizer();
             initEventListeners();
 
