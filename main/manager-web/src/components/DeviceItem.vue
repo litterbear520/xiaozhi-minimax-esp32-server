@@ -19,7 +19,7 @@
     <div class="device-name">
       {{ $t('home.voiceModel') }}：{{ device.ttsModelName }} ({{ device.ttsVoiceName }})
     </div>
-    <div style="display: flex;gap: 10px;align-items: center;">
+    <div style="display: flex;gap: 10px;align-items: center;flex-wrap: wrap;">
       <div class="settings-btn" @click="handleConfigure">
         {{ $t('home.configureRole') }}
       </div>
@@ -35,6 +35,9 @@
           <span>{{ $t('home.chatHistory') }}</span>
         </el-tooltip>
         <span v-else>{{ $t('home.chatHistory') }}</span>
+      </div>
+      <div class="settings-btn test-page-btn" @click="handleTestPage">
+        {{ $t('home.testPage') }}
       </div>
     </div>
     <div class="version-info">
@@ -93,6 +96,9 @@ export default {
         return
       }
       this.$emit('chat-history', { agentId: this.device.agentId, agentName: this.device.agentName })
+    },
+    handleTestPage() {
+      window.open('http://47.103.24.213:8002/test/test_page.html', '_blank')
     }
   }
 }
@@ -140,6 +146,11 @@ export default {
   background: #e6e6e6;
   color: #999;
   cursor: not-allowed;
+}
+
+.test-page-btn {
+  background: #e6f4ff;
+  color: #409eff;
 }
 </style>
 

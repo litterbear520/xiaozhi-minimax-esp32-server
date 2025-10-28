@@ -648,6 +648,7 @@ export default {
   'home.voiceprintRecognition': '声纹识别',
   'home.deviceManagement': '设备管理',
   'home.chatHistory': '聊天记录',
+  'home.testPage': '测试页面',
   'home.lastConversation': '最近对话',
   'home.noConversation': '暂未对话',
   'home.justNow': '刚刚',
@@ -656,7 +657,7 @@ export default {
   'home.confirmDeleteAgent': '确定要删除该智能体吗？',
   'home.deleteSuccess': '删除成功',
   'home.deleteFailed': '删除失败',
-  'home.enableMemory': '请先在“配置角色”界面开启记忆',
+  'home.enableMemory': '请先在"配置角色"界面开启记忆',
 
   // 参数管理页面文本
   'paramManagement.pageTitle': '参数管理',

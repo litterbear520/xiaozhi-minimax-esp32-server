@@ -648,6 +648,7 @@ export default {
   'home.voiceprintRecognition': 'Voiceprint',
   'home.deviceManagement': 'Devices',
   'home.chatHistory': 'Chat History',
+  'home.testPage': 'Test Page',
   'home.lastConversation': 'Last Conversation',
   'home.noConversation': 'No conversation',
   'home.justNow': 'Just now',
