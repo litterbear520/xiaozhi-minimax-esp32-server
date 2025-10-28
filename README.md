@@ -35,7 +35,7 @@
 ### 🎯 Minimax AI 深度集成
 
 #### 1. **Minimax LLM（大语言模型）支持**
-- ✅ 集成 Minimax abab6.5s-chat 模型
+- ✅ 集成 Minimax的LLM模型
 - ✅ 完整的对话上下文管理
 - ✅ 支持流式响应
 - ✅ 兼容 OpenAI API 调用规范
@@ -43,8 +43,8 @@
 #### 2. **Minimax TTS（语音合成）支持**
 - ✅ 集成 Minimax speech-01-turbo 模型
 - ✅ 流式语音合成，低延迟响应
-- 🎤 **特色音色**: 完美复刻小智"湾湾"音色
-  - 音色ID: `vc_wanwan_0303_02-wanwan_0303_01_0303_1047`
+- 🎤 **特色音色**: 
+  - MinimaxAPI提供上千种不同的音色
   - 该音色经过专业调优，完美匹配小智硬件的声音特质
   - 提供自然、流畅的语音交互体验
 
@@ -98,7 +98,7 @@ type: minimax
 model: speech-01-turbo
 group_id: 你的_GROUP_ID
 api_key: 你的_MINIMAX_API_KEY
-voice_id: vc_wanwan_0303_02-wanwan_0303_01_0303_1047  # 湾湾音色
+voiceid: 可联系Minimax提供更多音色支持
 ```
 
 ---
@@ -114,21 +114,6 @@ xiaozhi-esp32-server/
 ├── docker-compose.yml         # Docker 编排配置
 └── README.md                  # 本文档
 ```
-
----
-
-## 🎤 关于"湾湾"音色
-
-"湾湾"是小智项目的标志性音色，本定制版通过 Minimax TTS 平台实现了该音色的完美复刻：
-
-- **音色ID**: `vc_wanwan_0303_02-wanwan_0303_01_0303_1047`
-- **特点**: 
-  - 温暖亲切的女声
-  - 清晰自然的发音
-  - 适合智能助手场景
-  - 与小智硬件形象高度契合
-
-使用该音色可以获得与原版小智硬件一致的语音体验。
 
 ---
 
@@ -148,8 +133,8 @@ xiaozhi-esp32-server/
 ## 📝 更新日志
 
 ### v1.0.0 (2025-10)
-- ✅ 集成 Minimax LLM (abab6.5s-chat)
-- ✅ 集成 Minimax TTS (speech-01-turbo) + 湾湾音色
+- ✅ 默认配置 Minimax LLM (abab6.5s-chat)
+- ✅ 默认配置 Minimax TTS (speech-01-turbo) + 专属音色
 - ✅ 实现 SaaS 多租户架构
 - ✅ 用户级配置隔离和权限控制
 - ✅ 新用户自动初始化精简配置
@@ -179,9 +164,15 @@ xiaozhi-esp32-server/
 
 ---
 
-## 📧 联系方式
+## 📞 技术支持与交流
 
-如有问题或建议，欢迎通过 Issues 反馈。
+### 💬 加入微信技术交流群
+
+欢迎扫码加入我们的微信技术交流群，与开发者和用户一起讨论：
+
+<div align="center">
+  <img src="docs/images/wechat-qrcode.jpeg" alt="微信技术交流群" width="300"/>
+</div>
 
 ---
 

@@ -43,8 +43,7 @@ This customized version includes the following core enhancements:
 #### 2. **Minimax TTS Support**
 - ✅ Integrated Minimax speech-01-turbo model
 - ✅ Streaming speech synthesis with low latency
-- 🎤 **Featured Voice**: Perfect replication of Xiaozhi's "Wanwan" voice
-  - Voice ID: `vc_wanwan_0303_02-wanwan_0303_01_0303_1047`
+- 🎤 **Featured Voice**: 
   - Professionally tuned to match Xiaozhi hardware's voice characteristics
   - Natural and fluent voice interaction experience
 
@@ -97,7 +96,7 @@ type: minimax
 model: speech-01-turbo
 group_id: YOUR_GROUP_ID
 api_key: YOUR_MINIMAX_API_KEY
-voice_id: vc_wanwan_0303_02-wanwan_0303_01_0303_1047  # Wanwan voice
+voice_id: You can contact Minimax for more voice tone support.  # Wanwan voice
 ```
 
 ---
@@ -113,21 +112,6 @@ xiaozhi-esp32-server/
 ├── docker-compose.yml         # Docker compose configuration
 └── README.md                  # This document
 ```
-
----
-
-## 🎤 About "Wanwan" Voice
-
-"Wanwan" is the iconic voice of Xiaozhi project. This customized version perfectly replicates it through Minimax TTS platform:
-
-- **Voice ID**: `vc_wanwan_0303_02-wanwan_0303_01_0303_1047`
-- **Characteristics**: 
-  - Warm and friendly female voice
-  - Clear and natural pronunciation
-  - Suitable for intelligent assistant scenarios
-  - Highly consistent with Xiaozhi hardware image
-
-Using this voice provides the same voice experience as the original Xiaozhi hardware.
 
 ---
 
@@ -178,9 +162,15 @@ This project follows the MIT License of the original project.
 
 ---
 
-## 📧 Contact
+## 📞 Technical Support & Community
 
-For questions or suggestions, please submit via Issues.
+### 💬 Join WeChat Technical Group
+
+Welcome to join our WeChat technical exchange group to discuss with developers and users:
+
+<div align="center">
+  <img src="docs/images/wechat-qrcode.jpeg" alt="WeChat Technical Group" width="300"/>
+</div>
 
 ---
 
