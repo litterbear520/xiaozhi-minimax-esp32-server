@@ -98,7 +98,8 @@ export default {
       this.$emit('chat-history', { agentId: this.device.agentId, agentName: this.device.agentName })
     },
     handleTestPage() {
-      window.open('http://47.103.24.213:8002/test/test_page.html', '_blank')
+      // 将智能体ID作为参数传递给测试页面
+      window.open(`http://47.103.24.213:8002/test/test_page.html?agentId=${this.device.agentId}`, '_blank')
     }
   }
 }
