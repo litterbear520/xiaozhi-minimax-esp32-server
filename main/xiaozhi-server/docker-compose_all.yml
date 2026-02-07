@@ -24,12 +24,14 @@ services:
     volumes:
       # 配置文件目录
       - ./data:/opt/xiaozhi-esp32-server/data
-      # 模型文件挂接，很重要
-      - ./models/SenseVoiceSmall/model.pt:/opt/xiaozhi-esp32-server/models/SenseVoiceSmall/model.pt
+      # 模型文件目录挂接（挂载整个目录而不是单个文件）
+      #  - ./models/SenseVoiceSmall/model.pt:/opt/xiaozhi-esp32-server/models/SenseVoiceSmall/model.pt
+      - ./models:/opt/xiaozhi-esp32-server/models
 
   # manager-api和manager-web模块
   xiaozhi-esp32-server-web:
-    image: xiaozhi-web-local:latest
+    # image: xiaozhi-web-local:latest
+    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:web_latest
     container_name: xiaozhi-esp32-server-web
     restart: always
     networks:
