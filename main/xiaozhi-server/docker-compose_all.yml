@@ -27,6 +27,10 @@ services:
       # 模型文件目录挂接（挂载整个目录而不是单个文件）
       #  - ./models/SenseVoiceSmall/model.pt:/opt/xiaozhi-esp32-server/models/SenseVoiceSmall/model.pt
       - ./models:/opt/xiaozhi-esp32-server/models
+      # 挂载新的TTS文件
+      - ./core/providers/tts/qwen3_tts_realtime.py:/opt/xiaozhi-esp32-server/core/providers/tts/qwen3_tts_realtime.py:ro
+      - ./core/providers/tts/huoshan_double_stream.py:/opt/xiaozhi-esp32-server/core/providers/tts/huoshan_double_stream.py:ro
+      - ./core/providers/tts/minimax_httpstream.py:/opt/xiaozhi-esp32-server/core/providers/tts/minimax_httpstream.py:ro
 
   # manager-api和manager-web模块
   xiaozhi-esp32-server-web:

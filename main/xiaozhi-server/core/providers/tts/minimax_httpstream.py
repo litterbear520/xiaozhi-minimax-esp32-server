@@ -20,6 +20,11 @@ logger = setup_logging()
 class TTSProvider(TTSProviderBase):
     def __init__(self, config, delete_audio_file):
         super().__init__(config, delete_audio_file)
+        
+        # 性能指标
+        self.first_text_time = None  # 第一次发送文本的时间（毫秒）
+        self.first_audio_time = None  # 第一次收到音频的时间（毫秒）
+        
         self.group_id = config.get("group_id")
         self.api_key = config.get("api_key")
         self.model = config.get("model")
@@ -82,6 +87,9 @@ class TTSProvider(TTSProviderBase):
                     self.processed_chars = 0
                     self.tts_text_buff = []
                     self.before_stop_play_files.clear()
+                    # 重置性能指标
+                    self.first_text_time = None
+                    self.first_audio_time = None
                 elif ContentType.TEXT == message.content_type:
                     self.tts_text_buff.append(message.content_detail)
                     segment_text = self._get_segment_text()
@@ -120,8 +128,33 @@ class TTSProvider(TTSProviderBase):
                 self.processed_chars += len(full_text)
             else:
                 self._process_before_stop_play_files()
+                self._print_metric()
         else:
             self._process_before_stop_play_files()
+            self._print_metric()
+    
+    def _print_metric(self):
+        """打印性能指标"""
+        if self.first_text_time and self.first_audio_time:
+            first_audio_delay = self.first_audio_time - self.first_text_time
+            metric_msg = f"[Metric] session_id={getattr(self.conn, 'sentence_id', 'unknown')}, first_audio_delay={first_audio_delay:.2f}ms"
+            logger.bind(tag=TAG).info(metric_msg)
+            
+            # 发送指标到前端
+            try:
+                import asyncio
+                metric_data = {
+                    "type": "metric",
+                    "session_id": getattr(self.conn, 'sentence_id', 'unknown'),
+                    "first_audio_delay": first_audio_delay,
+                    "message": metric_msg
+                }
+                asyncio.run_coroutine_threadsafe(
+                    self.conn.websocket.send(json.dumps(metric_data)),
+                    self.conn.loop
+                )
+            except Exception as e:
+                logger.bind(tag=TAG).debug(f"发送指标到前端失败: {str(e)}")
 
     def to_tts_single_stream(self, text, is_last=False):
         try:
@@ -150,6 +183,12 @@ class TTSProvider(TTSProviderBase):
 
     async def text_to_speak(self, text, is_last):
         """流式处理TTS音频，每句只推送一次音频列表"""
+        
+        # 记录第一次发送文本的时间
+        if self.first_text_time is None:
+            self.first_text_time = time.time() * 1000  # 转换为毫秒
+            logger.bind(tag=TAG).debug(f"记录首次发送文本时间: {self.first_text_time}")
+        
         payload = {
             "model": self.model,
             "text": text,
@@ -219,6 +258,11 @@ class TTSProvider(TTSProviderBase):
                                 if status == 1 and audio_hex:
                                     pcm_data = bytes.fromhex(audio_hex)
                                     self.pcm_buffer.extend(pcm_data)
+                                    
+                                    # 记录第一次收到音频的时间
+                                    if self.first_audio_time is None:
+                                        self.first_audio_time = time.time() * 1000  # 转换为毫秒
+                                        logger.bind(tag=TAG).debug(f"记录首次收到音频时间: {self.first_audio_time}")
 
                             except json.JSONDecodeError as e:
                                 logger.bind(tag=TAG).error(f"JSON解析失败: {e}")
@@ -244,6 +288,24 @@ class TTSProvider(TTSProviderBase):
                     # 如果是最后一段，输出音频获取完毕
                     if is_last:
                         self._process_before_stop_play_files()
+                        
+                        # 计算并打印性能指标
+                        if self.first_text_time and self.first_audio_time:
+                            first_audio_delay = self.first_audio_time - self.first_text_time
+                            metric_msg = f"[Metric] session_id={getattr(self.conn, 'sentence_id', 'unknown')}, first_audio_delay={first_audio_delay:.2f}ms"
+                            logger.bind(tag=TAG).info(metric_msg)
+                            
+                            # 发送指标到前端
+                            try:
+                                metric_data = {
+                                    "type": "metric",
+                                    "session_id": getattr(self.conn, 'sentence_id', 'unknown'),
+                                    "first_audio_delay": first_audio_delay,
+                                    "message": metric_msg
+                                }
+                                await self.conn.websocket.send(json.dumps(metric_data))
+                            except Exception as e:
+                                logger.bind(tag=TAG).debug(f"发送指标到前端失败: {str(e)}")
 
         except Exception as e:
             logger.bind(tag=TAG).error(f"TTS请求异常: {e}")

@@ -145,6 +145,12 @@ class TTSProvider(TTSProviderBase):
         self.ws = None
         self.interface_type = InterfaceType.DUAL_STREAM
         self._monitor_task = None  # 监听任务引用
+        
+        # 性能指标
+        self.first_text_time = None  # 第一次发送文本的时间（毫秒）
+        self.first_audio_time = None  # 第一次收到音频的时间（毫秒）
+        self.current_session_id = None  # 当前会话ID
+        
         self.appId = config.get("appid")
         self.access_token = config.get("access_token")
         self.cluster = config.get("cluster")
@@ -299,6 +305,12 @@ class TTSProvider(TTSProviderBase):
             #  过滤Markdown
             filtered_text = MarkdownCleaner.clean_markdown(text)
 
+            # 记录第一次发送文本的时间
+            if self.first_text_time is None:
+                import time
+                self.first_text_time = time.time() * 1000  # 转换为毫秒
+                logger.bind(tag=TAG).debug(f"记录首次发送文本时间: {self.first_text_time}")
+
             # 发送文本
             await self.send_text(self.voice, filtered_text, self.conn.sentence_id)
             return
@@ -449,12 +461,41 @@ class TTSProvider(TTSProviderBase):
                         res.optional.event == EVENT_TTSResponse
                         and res.header.message_type == AUDIO_ONLY_RESPONSE
                     ):
+                        # 记录第一次收到音频的时间
+                        if self.first_audio_time is None:
+                            import time
+                            self.first_audio_time = time.time() * 1000  # 转换为毫秒
+                            logger.bind(tag=TAG).debug(f"记录首次收到音频时间: {self.first_audio_time}")
+                        
                         self.wav_to_opus_data_audio_raw_stream(res.payload, callback=self.handle_opus)
                     elif res.optional.event == EVENT_TTSSentenceEnd:
                         logger.bind(tag=TAG).info(f"句子语音生成成功：{self.tts_text}")
                     elif res.optional.event == EVENT_SessionFinished:
                         logger.bind(tag=TAG).debug(f"会话结束～～")
                         self._process_before_stop_play_files()
+                        
+                        # 计算并打印性能指标
+                        if self.first_text_time and self.first_audio_time:
+                            first_audio_delay = self.first_audio_time - self.first_text_time
+                            metric_msg = f"[Metric] session_id={self.conn.sentence_id}, first_audio_delay={first_audio_delay:.2f}ms"
+                            logger.bind(tag=TAG).info(metric_msg)
+                            
+                            # 发送指标到前端
+                            try:
+                                metric_data = {
+                                    "type": "metric",
+                                    "session_id": self.conn.sentence_id,
+                                    "first_audio_delay": first_audio_delay,
+                                    "message": metric_msg
+                                }
+                                await self.conn.websocket.send(json.dumps(metric_data))
+                            except Exception as e:
+                                logger.bind(tag=TAG).debug(f"发送指标到前端失败: {str(e)}")
+                            
+                            # 重置指标，为下次会话准备
+                            self.first_text_time = None
+                            self.first_audio_time = None
+                        
                         session_finished = True
                         break
                 except websockets.ConnectionClosed:

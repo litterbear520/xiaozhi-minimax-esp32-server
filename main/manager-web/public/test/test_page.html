@@ -809,6 +809,9 @@
                                 if (message.text && message.text !== '😊') {
                                     addMessage(message.text);
                                 }
+                            } else if (message.type === 'metric') {
+                                // TTS性能指标
+                                log(`${message.message}`, 'success');
                             } else if (message.type === 'mcp') {
                                 const payload = message.payload || {};
                                 log(`服务器下发: ${JSON.stringify(message)}`, 'info');
